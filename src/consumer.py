@@ -9,7 +9,7 @@ from faststream.rabbit import RabbitMessage
 
 
 from core.database import db_conn
-from core.observability import setup_sentry
+
 from schema.payment import PaymentStatus
 from service.payment.service import PaymentService
 from service.broker.rabbit_connection import (
@@ -23,7 +23,7 @@ from service.broker.rabbit_connection import (
 )
 
 log = logging.getLogger(__name__)
-setup_sentry("payments-consumer")
+
 
 
 async def send_webhook(url: str, payload: dict[str, Any]) -> None:

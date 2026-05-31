@@ -2,11 +2,11 @@ from fastapi import FastAPI
 from starlette.middleware import Middleware
 from starlette.middleware.cors import CORSMiddleware
 from core.config import config
-from core.observability import setup_sentry
+
 from api.router import general_router
 from utils.middlewere.x_api_key import APIKeyMiddleware
 
-# setup_sentry("payments-api")
+
 
 middleware = [
     Middleware(

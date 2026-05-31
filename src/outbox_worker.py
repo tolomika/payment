@@ -7,14 +7,15 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.database import db_conn
-from core.observability import setup_sentry
+
 from model import PaymentEvent
 from service.broker.rabbit_connection import broker, declare_topology, payments_exchange
 
 log = logging.getLogger(__name__)
-setup_sentry("payments-outbox-worker")
+
 
 log.info(f"Starting {__name__}")
+
 
 async def drain(session: AsyncSession) -> None:
     async with session.begin():
