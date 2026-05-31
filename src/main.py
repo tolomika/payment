@@ -6,7 +6,7 @@ from core.observability import setup_sentry
 from api.router import general_router
 from utils.middlewere.x_api_key import APIKeyMiddleware
 
-setup_sentry("payments-api")
+# setup_sentry("payments-api")
 
 middleware = [
     Middleware(
