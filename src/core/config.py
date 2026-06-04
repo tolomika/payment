@@ -109,3 +109,5 @@ class APPSettings(BaseSettings):
     db: DatabaseConfig = DatabaseConfig()
 
 config = APPSettings()
+
+print(config.db.url(async_url=False))

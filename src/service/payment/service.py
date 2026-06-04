@@ -3,24 +3,35 @@ from decimal import Decimal
 import uuid
 from typing import Any
 
-from sqlalchemy import select, update
-from sqlalchemy.ext.asyncio import AsyncSession
-
-from model import Payment, IdempotencyKey, PaymentEvent
+from domain.payment import IdempotencyRecord, PaymentEntity, PaymentEventEntity
+from repository.idempotency import IdempotencyRepository
+from repository.payment import PaymentRepository
+from repository.payment_event import PaymentEventRepository
+from repository.transaction import DatabaseTransaction
 from schema.payment import PaymentStatus, Currency
 
+
 class PaymentService:
-    def __init__(self, session: AsyncSession) -> None:
-        self.session = session
+    def __init__(
+        self,
+        payments: PaymentRepository,
+        idempotency_keys: IdempotencyRepository,
+        payment_events: PaymentEventRepository,
+        transaction: DatabaseTransaction,
+    ) -> None:
+        self.payments = payments
+        self.idempotency_keys = idempotency_keys
+        self.payment_events = payment_events
+        self.transaction = transaction
 
     @staticmethod
-    def payment_to_response(payment: Payment) -> dict[str, Any]:
+    def payment_to_response(payment: PaymentEntity) -> dict[str, Any]:
         return {
             "id": payment.id,
             "amount": payment.amount,
             "currency": payment.currency,
             "description": payment.description,
-            "metadata": payment.metadata_,
+            "metadata": payment.metadata,
             "status": payment.status,
             "webhook_url": payment.webhook_url,
             "created_at": payment.created_at,
@@ -28,7 +39,7 @@ class PaymentService:
         }
 
     @staticmethod
-    def payment_to_create_response(payment: Payment) -> dict[str, Any]:
+    def payment_to_create_response(payment: PaymentEntity) -> dict[str, Any]:
         return {
             "payment_id": payment.id,
             "status": payment.status,
@@ -41,21 +52,13 @@ class PaymentService:
         except ValueError:
             return None
 
-        result = await self.session.execute(
-            select(Payment).where(Payment.id == parsed_id)
-        )
-        payment = result.scalar_one_or_none()
+        payment = await self.payments.get_by_id(parsed_id)
         if not payment:
             return None
         return self.payment_to_response(payment)
 
-    async def get_idempotency(self, idempotency_key: str) -> IdempotencyKey | None:
-        idempotency = await self.session.execute(
-            select(IdempotencyKey).where(
-                IdempotencyKey.key == idempotency_key
-            )
-        )
-        return idempotency.scalar_one_or_none()
+    async def get_idempotency(self, idempotency_key: str) -> IdempotencyRecord | None:
+        return await self.idempotency_keys.get_by_key(idempotency_key)
 
     async def create_payment(
         self,
@@ -66,29 +69,30 @@ class PaymentService:
         webhook_url: str,
         idempotency_key: str,
     ) -> dict[str, Any]:
-        async with self.session.begin():
+        async with self.transaction.begin():
             idempotency = await self.get_idempotency(idempotency_key)
             if idempotency:
                 return idempotency.response
 
             payment_id = uuid.uuid4()
             created_at = datetime.now(timezone.utc)
-            payment = Payment(
+            payment = PaymentEntity(
                 id=payment_id,
                 amount=amount,
                 currency=currency.value,
                 description=description,
-                metadata_=metadata,
+                metadata=metadata,
                 status=PaymentStatus.pending.value,
                 webhook_url=webhook_url,
                 created_at=created_at,
             )
 
-            self.session.add(payment)
+            self.payments.add(payment)
 
             response = self.payment_to_create_response(payment)
 
-            event = PaymentEvent(
+            event = PaymentEventEntity(
+                id=uuid.uuid4(),
                 payment_id=payment_id,
                 event_type="payment.new",
                 routing_key="payments.new",
@@ -106,9 +110,9 @@ class PaymentService:
                 created_at=created_at,
             )
 
-            self.session.add(event)
+            self.payment_events.add(event)
 
-            idem = IdempotencyKey(
+            idem = IdempotencyRecord(
                 key=idempotency_key,
                 payment_id=payment_id,
                 response={
@@ -119,21 +123,22 @@ class PaymentService:
                 created_at=created_at,
             )
 
-            self.session.add(idem)
+            self.idempotency_keys.add(idem)
 
-            await self.session.flush()
+            await self.transaction.flush()
 
             return response
 
     async def update_payment_status(self, id: str, status: PaymentStatus | str) -> None:
         payment_id = uuid.UUID(str(id))
-        status_value = status.value if isinstance(status, PaymentStatus) else status
-        await self.session.execute(
-            update(Payment)
-            .where(Payment.id == payment_id)
-            .values(
-                status=status_value,
-                processed_at=datetime.now(timezone.utc),
-            )
-        )
-        await self.session.commit()
+        await self.payments.update_status(payment_id, status)
+        await self.transaction.commit()
+
+    async def get_unpublished_events(self, limit: int | None=None) -> list[PaymentEventEntity]:
+        return await self.payment_events.get_unpublished_batch(limit=limit)
+
+    async def mark_as_published(self, event_id: uuid.UUID):
+        await self.payment_events.mark_published(event_id=event_id)
+
+    async def mark_failed(self, event_id: uuid.UUID, error: str) -> None:
+        await self.payment_events.mark_failed(event_id=event_id, error=error)

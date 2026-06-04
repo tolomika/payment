@@ -6,7 +6,7 @@ from starlette import status
 
 from core.database import db_conn
 
-from service.payment.service import PaymentService
+from service.payment.factory import get_payment_service
 from api.v1.payment.schema import (
     PaymentCreateRequest,
     PaymentCreateResponse,
@@ -22,7 +22,7 @@ async def create_payment(
     payload: PaymentCreateRequest,
     idempotency_key: str = Header(..., alias="Idempotency-Key"),
 ) -> dict:
-    payment_service = PaymentService(session)
+    payment_service = get_payment_service(session)
     return await payment_service.create_payment(
         amount=payload.amount,
         currency=payload.currency,
@@ -37,7 +37,7 @@ async def get_payment(
         session: Annotated[AsyncSession, Depends(db_conn.get_db)],
         payment_id: str,
 ) -> dict:
-    payment_service = PaymentService(session)
+    payment_service = get_payment_service(session)
     payment = await payment_service.get_payment(payment_id)
     if not payment:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
@@ -48,6 +48,6 @@ async def send_payment_status_webhook(
         session: Annotated[AsyncSession, Depends(db_conn.get_db)],
         payload: PaymentWebhookRequest,
 ) -> bool:
-    payment_service = PaymentService(session)
+    payment_service = get_payment_service(session)
     await payment_service.update_payment_status(id=payload.id, status=payload.status)
     return True

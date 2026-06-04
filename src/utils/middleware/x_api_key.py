@@ -1,17 +1,13 @@
-from dotenv import load_dotenv
-
-from fastapi import Request, HTTPException
+from fastapi import Request
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
-from core.config import config
 
-load_dotenv()
+from core.config import config
 
 
 
 class APIKeyMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
-        # skip api
         if request.url.path in ["/docs/", "/openapi.json", "/redoc/", "/swagger/"]:
             return await call_next(request)
 

@@ -9,12 +9,10 @@ from model.base import Base
 
 
 class IdempotencyKey(Base):
-    __tablename__ = "idempotency_keys"
-
     key: Mapped[str] = mapped_column(String(255), primary_key=True)
     payment_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("payments.id", ondelete="CASCADE"),
+        ForeignKey("payment.id", ondelete="CASCADE"),
         nullable=False,
     )
     response: Mapped[dict] = mapped_column(JSONB, nullable=False)

@@ -9,8 +9,6 @@ from model.base import Base
 
 
 class PaymentEvent(Base):
-    __tablename__ = "outbox"
-
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
         primary_key=True,
@@ -20,7 +18,7 @@ class PaymentEvent(Base):
     routing_key: Mapped[str] = mapped_column(String(128), index=True)
     payment_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("payments.id"),
+        ForeignKey("payment.id"),
         index=True,
         nullable=False,
     )

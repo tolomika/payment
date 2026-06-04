@@ -9,9 +9,8 @@ from faststream.rabbit import RabbitMessage
 
 
 from core.database import db_conn
-
 from schema.payment import PaymentStatus
-from service.payment.service import PaymentService
+from service.payment.factory import get_payment_service
 from service.broker.rabbit_connection import (
     app,
     broker,
@@ -23,7 +22,6 @@ from service.broker.rabbit_connection import (
 )
 
 log = logging.getLogger(__name__)
-
 
 
 async def send_webhook(url: str, payload: dict[str, Any]) -> None:
@@ -72,7 +70,7 @@ async def process_payment(message: dict[str, Any], msg: RabbitMessage) -> None:
     payment_id = message["id"]
     try:
         async with db_conn.session() as session:
-            payment_service = PaymentService(session)
+            payment_service = get_payment_service(session)
             payment = await payment_service.get_payment(payment_id)
             if not payment:
                 raise ValueError(f"Payment {payment_id} not found")

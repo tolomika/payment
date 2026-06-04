@@ -10,8 +10,6 @@ from model.base import Base
 
 
 class Payment(Base):
-    __tablename__ = "payments"
-
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     amount: Mapped[Decimal] = mapped_column(Numeric(18, 2), nullable=False)
     currency: Mapped[str] = mapped_column(String(), nullable=False)

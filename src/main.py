@@ -4,7 +4,7 @@ from starlette.middleware.cors import CORSMiddleware
 from core.config import config
 
 from api.router import general_router
-from utils.middlewere.x_api_key import APIKeyMiddleware
+from utils.middleware.x_api_key import APIKeyMiddleware
 
 
 
